@@ -1,13 +1,19 @@
-from subjects.base import BaseSubject
-from effectors.log_effector import LogEffector
-from effectors.state_effector import StateEffector
-from effectors.message_effector import MessageEffector
+# subjects/root.py
+from spx_types.event import Event, EventType, EventChannel
+from utils.diagnostics import log_info
 
-class RootSubject(BaseSubject):
-    def __init__(self, kem, kmm, isp):
-        super().__init__("Root", kem, kmm, isp)
-        self.ae.registry = {
-            "LogEffector": LogEffector(),
-            "StateEffector": StateEffector(self.state),
-            "MessageEffector": MessageEffector(self.kem),
-        }
+class RootSubject:
+    subject_id = "ROOT"
+
+    def __init__(self, subject_id, kem, kmm, isp, cfg):
+        self.subject_id = subject_id
+        self.kem = kem
+        self.kmm = kmm
+        self.isp = isp
+        self.cfg = cfg
+
+    def hb_cycle(self):
+        log_info(f"{self.subject_id}: HB-cycle")
+
+    def rf_cycle(self):
+        log_info(f"{self.subject_id}: RF-cycle (noop)")
