@@ -178,3 +178,14 @@ class KernelEventMesh:
             "kernel_queue": [ev.id for ev in self.kernel_queue],
             "subject_queue": [ev.id for ev in self.subject_queue],
         }
+
+    # ---- subject/kernel lengths for KMS ----
+    def kernel_len(self) -> int:
+        return len(self.kernel_queue)
+
+    def subject_total_len(self) -> int:
+        return len(self.subject_queue)
+
+    def subject_len(self, subject_id: str) -> int:
+        return sum(1 for e in self.subject_queue if getattr(e, "subject_id", None) == subject_id)
+

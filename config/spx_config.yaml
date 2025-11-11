@@ -1,5 +1,5 @@
 system:
-  hb_period: 0.1
+  hb_period: 0.15
   rf_slot_max: 1.0        # сек, максимум безперервного часу в RF
   rf_cooldown: 0.5        # сек, захист від частих входів у RF
   rf_triggers:
@@ -17,3 +17,9 @@ kem:
   kernel_max: 1024
   subject_max: 4096
   policy: drop_oldest
+
+scheduler:
+  rf_trigger_debt: 4
+  rf_max_cycles: 2
+  kernel_overload_threshold: 6
+  fairness_decay: 0.85
