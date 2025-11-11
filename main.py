@@ -1,11 +1,21 @@
 from time import sleep
 from bootstrap import spx_bootstrap
 from utils.diagnostics import log_info
+from spx_types.event import Event, EventType
 
 def main():
     ctx = spx_bootstrap()
     kem, kms, spm = ctx["kem"], ctx["kms"], ctx["spm"]
     log_info("SPX-OS: entering demo loop...")
+
+    for i in range(5):
+        ctx["kem"].publish(Event.subject(
+            subject_id="ROOT",
+            type_=EventType.SYSTEM,
+            payload={"n": i},
+            salience=0.5,
+            credibility=1.0
+        ))
 
     for _ in range(18):
         kms.on_cycle_begin(kem, ctx["kmm"])
