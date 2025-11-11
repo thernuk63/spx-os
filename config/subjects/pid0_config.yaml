@@ -1,0 +1,4 @@
+subject_type: PID0
+capabilities:
+  - system_monitor
+  - spawn_control

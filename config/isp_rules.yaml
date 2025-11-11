@@ -1,0 +1,5 @@
+rules:
+  - allow: LogEffector
+  - allow: StateEffector
+  - allow: MessageEffector
+  - deny: ExternalCall
