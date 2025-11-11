@@ -1,11 +1,19 @@
 system:
-  HB_period: 0.1
-  RF_slot_max: 1.0
-  debt_threshold: 5
-  salience_threshold: 0.7
+  hb_period: 0.1
+  rf_slot_max: 1.0        # сек, максимум безперервного часу в RF
+  rf_cooldown: 0.5        # сек, захист від частих входів у RF
+  rf_triggers:
+    debt_threshold: 5     # когнітивний борг (умовні одиниці)
+    entropy_threshold: 0.7
+
 
 subjects:
   PID0:
     T1_multiplier: 1.0
   Root:
     T1_multiplier: 1.0
+
+kem:
+  kernel_max: 1024
+  subject_max: 4096
+  policy: drop_oldest
