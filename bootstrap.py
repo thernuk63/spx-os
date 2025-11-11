@@ -7,7 +7,7 @@ from kernel.kms import KernelMetaScheduler
 from kernel.spm import SubjectProcessManager
 from subjects.pid0 import PID0
 from subjects.root import RootSubject
-from types.event import Event, EventType, EventChannel
+from spx_types.event import Event, EventType, EventChannel
 
 def spx_bootstrap():
     log_info("SPX-OS: Loading config...")

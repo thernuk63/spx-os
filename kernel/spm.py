@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Type, Dict, Any
 from uuid import uuid4
 from utils.diagnostics import log_info
-from types.event import Event, EventType, EventChannel
+from spx_types.event import Event, EventType, EventChannel
 
 SYSTEM_IDS = {"PID0", "ROOT"}
 

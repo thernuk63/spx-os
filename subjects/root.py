@@ -1,5 +1,5 @@
 # subjects/root.py
-from types.event import Event, EventType, EventChannel
+from spx_types.event import Event, EventType, EventChannel
 from utils.diagnostics import log_info
 
 class RootSubject:

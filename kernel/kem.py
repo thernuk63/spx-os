@@ -12,7 +12,7 @@ KEM guarantees:
 
 from collections import deque
 from typing import Optional, Dict, List
-from types.event import Event, EventChannel
+from spx_types.event import Event, EventChannel
 
 
 class KernelEventMesh:
