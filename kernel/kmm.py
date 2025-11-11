@@ -1,30 +1,37 @@
-import networkx as nx
-from typing import Any, Dict, List, Tuple
-from utils.diagnostics import log_info
+from __future__ import annotations
+from typing import Dict, Any, Optional
+
+from .kmm_engine_v02 import KernelMemoryModelV02, KMMConfigV02
 
 class KernelMemoryModel:
-    def __init__(self) -> None:
-        self.graph = nx.DiGraph()
-        self.pending_consolidations = 0
+    """
+    Обгортка для поточного інтерфейсу ядра (сумісність).
+    """
+    def __init__(self, inner: KernelMemoryModelV02) -> None:
+        self._inner = inner
 
     @classmethod
-    def init(cls) -> "KernelMemoryModel":
-        kmm = cls()
-        log_info("KMM: initialized (WM+EM views on single T-TPG).")
-        return kmm
+    def init(cls, cfg: Optional[Dict[str, Any]] = None) -> "KernelMemoryModel":
+        return cls(KernelMemoryModelV02.init(cfg))
 
-    # Simplified operations
-    def encode_wm(self, node_id: str, payload: Dict[str, Any]) -> None:
-        self.graph.add_node(node_id, **payload, scope="WM")
+    # Проксі-методи (мінімум, що потрібно ядру прямо зараз):
+    def encode_event(self, *a, **kw):
+        return self._inner.encode_event(*a, **kw)
 
-    def encode_em(self, node_id: str, payload: Dict[str, Any]) -> None:
-        self.graph.add_node(node_id, **payload, scope="EM")
+    def consolidate(self, *a, **kw):
+        return self._inner.consolidate(*a, **kw)
 
-    def bind(self, src: str, dst: str, rel_type: str) -> None:
-        self.graph.add_edge(src, dst, rel_type=rel_type)
+    def decay(self, *a, **kw):
+        return self._inner.decay(*a, **kw)
 
-    def wm_load(self) -> int:
-        return sum(1 for _, data in self.graph.nodes(data=True) if data.get("scope") == "WM")
+    def retrieve(self, *a, **kw):
+        return self._inner.retrieve(*a, **kw)
 
-    def total_nodes(self) -> int:
-        return self.graph.number_of_nodes()
+    def bind(self, *a, **kw):
+        return self._inner.bind(*a, **kw)
+
+    def tag(self, *a, **kw):
+        return self._inner.tag(*a, **kw)
+
+    def snapshot(self):
+        return self._inner.snapshot()
