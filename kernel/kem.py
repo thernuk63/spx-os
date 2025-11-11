@@ -1,112 +1,152 @@
-# kernel/kem.py
+"""
+Kernel Event Mesh (KEM) — SPX-OS v0.2
+Dual-Queue Event Manager with kernel-first priority.
+
+This module implements the event routing layer of SPX-OS.
+KEM guarantees:
+- strict FIFO per queue
+- kernel queue always has priority
+- event channel separation (KERNEL vs SUBJECT)
+- minimal diagnostics and snapshot API
+"""
+
 from collections import deque
-from typing import Deque, Optional, Iterable, Callable
-from dataclasses import asdict
+from typing import Optional, Dict, List
+from types.event import Event, EventChannel
 
-from spx_types.event import Event, EventChannel
-from utils.time_utils import get_T0
-from utils.diagnostics import log_info
 
-class KEM:
+class KernelEventMesh:
     """
-    Dual-queue Kernel Event Manager:
-      - kernel_queue: пріоритет №1 (внутрішні події ядра)
-      - subject_queue: пріоритет №2 (події суб'єктів)
-    Гарантії:
-      - FIFO усередині кожної черги
-      - kernel_queue завжди випереджає subject_queue
+    Dual-queue event manager.
+    Kernel events have strict priority over subject events.
+
+    Public API:
+    - publish(event)
+    - publish_kernel_event(event)
+    - publish_subject_event(event)
+    - next_event()
+    - drain_kernel()
+    - drain_subject()
+    - drain_all()
+    - count()
+    - empty()
+    - debug_snapshot()
     """
 
-    def __init__(self) -> None:
-        self.kernel_queue: Deque[Event] = deque()
-        self.subject_queue: Deque[Event] = deque()
-        log_info("KEM: online (Dual-Queue, kernel-first).")
+    def __init__(self):
+        # Two independent FIFO queues
+        self.kernel_queue: deque[Event] = deque()
+        self.subject_queue: deque[Event] = deque()
 
-    # ---- Publish API ----
+    @classmethod
+    def init(cls, dual_queue: bool = True):
+        """
+        Static initializer used by bootstrap.
+        In v0.2 dual_queue is always True — placeholder for future modes.
+        """
+        return cls()
+
+    # ----------------------------------------------------------------------
+    # PUBLISH METHODS
+    # ----------------------------------------------------------------------
+
     def publish(self, event: Event) -> None:
-        if event.t0 is None:
-            event.t0 = get_T0()
-        if event.is_kernel():
+        """
+        General publish method.
+        Routes event into appropriate queue based on event.channel.
+        """
+        if event.channel == EventChannel.KERNEL:
             self.kernel_queue.append(event)
         else:
             self.subject_queue.append(event)
 
-    def publish_kernel(self, type_: str, payload: dict | None = None) -> None:
-        self.publish(Event(
-            type=type_,
-            payload=payload or {},
-            channel=EventChannel.KERNEL
-        ))
+    def publish_kernel_event(self, event: Event) -> None:
+        """
+        Shortcut for kernel-originated events.
+        Ensures channel correctness.
+        """
+        object.__setattr__(event, "channel", EventChannel.KERNEL)
+        self.kernel_queue.append(event)
 
-    def publish_subject(self, type_: str, subject_id: str, payload: dict | None = None) -> None:
-        self.publish(Event(
-            type=type_,
-            subject_id=subject_id,
-            payload=payload or {},
-            channel=EventChannel.SUBJECT
-        ))
+    def publish_subject_event(self, event: Event) -> None:
+        """
+        Shortcut for subject-originated events.
+        """
+        object.__setattr__(event, "channel", EventChannel.SUBJECT)
+        self.subject_queue.append(event)
 
-    # ---- Consume API ----
+    # ----------------------------------------------------------------------
+    # EVENT CONSUMPTION
+    # ----------------------------------------------------------------------
+
     def next_event(self) -> Optional[Event]:
+        """
+        Returns next event in priority order:
+        1. kernel queue
+        2. subject queue
+        Returns None if both queues empty.
+        """
         if self.kernel_queue:
             return self.kernel_queue.popleft()
         if self.subject_queue:
             return self.subject_queue.popleft()
         return None
 
-    def drain(self, limit: int | None = None) -> Iterable[Event]:
-        """Знімає події у порядку пріоритетів до limit (або всі)."""
-        count = 0
-        while True:
-            ev = self.next_event()
-            if ev is None:
-                break
-            yield ev
-            count += 1
-            if limit is not None and count >= limit:
-                break
-
-    def drain_for(self, predicate: Callable[[Event], bool], limit: int | None = None) -> list[Event]:
+    def drain_kernel(self) -> List[Event]:
         """
-        Вибіркова вибірка подій, що задовольняють predicate.
-        Інші події повертаємо назад у свої черги без зміни порядку.
+        Returns all kernel events in FIFO order and clears kernel queue.
         """
-        res: list[Event] = []
-        buf_kernel: Deque[Event] = deque()
-        buf_subject: Deque[Event] = deque()
-
-        # Переносимо тимчасово всі події в буфери, відфільтровуючи потрібні
-        while self.kernel_queue:
-            e = self.kernel_queue.popleft()
-            if predicate(e) and (limit is None or len(res) < limit):
-                res.append(e)
-            else:
-                buf_kernel.append(e)
-
-        while self.subject_queue:
-            e = self.subject_queue.popleft()
-            if predicate(e) and (limit is None or len(res) < limit):
-                res.append(e)
-            else:
-                buf_subject.append(e)
-
-        # Повертаємо назад у початковому порядку
-        self.kernel_queue.extendleft(reversed(buf_kernel))
-        self.subject_queue.extendleft(reversed(buf_subject))
-        return res
-
-    # ---- Admin/Diag ----
-    def size(self) -> tuple[int, int]:
-        return len(self.kernel_queue), len(self.subject_queue)
-
-    def clear(self) -> None:
+        items = list(self.kernel_queue)
         self.kernel_queue.clear()
-        self.subject_queue.clear()
+        return items
 
-    def snapshot(self) -> dict:
-        def _qdump(q: Deque[Event]) -> list[dict]:
-            return [asdict(e) for e in q]
+    def drain_subject(self) -> List[Event]:
+        """
+        Returns all subject events in FIFO order and clears subject queue.
+        """
+        items = list(self.subject_queue)
+        self.subject_queue.clear()
+        return items
+
+    def drain_all(self) -> Dict[str, List[Event]]:
+        """
+        Drain both queues and return dictionary:
+        {
+            "kernel": [...],
+            "subject": [...]
+        }
+        """
         return {
-            "kernel_queue": _qdump(self.kernel_queue),
-            "subject_queue": _qdump(self.subject_queue),
+            "kernel": self.drain_kernel(),
+            "subject": self.drain_subject()
+        }
+
+    # ----------------------------------------------------------------------
+    # DIAGNOSTICS
+    # ----------------------------------------------------------------------
+
+    def count(self) -> Dict[str, int]:
+        """
+        Returns count of queued events.
+        Useful for scheduler & monitoring.
+        """
+        return {
+            "kernel": len(self.kernel_queue),
+            "subject": len(self.subject_queue)
+        }
+
+    def empty(self) -> bool:
+        """
+        Returns True if both queues are empty.
+        """
+        return not self.kernel_queue and not self.subject_queue
+
+    def debug_snapshot(self) -> Dict[str, List[str]]:
+        """
+        Returns lightweight snapshot for diagnostics.
+        Contains only event IDs.
+        """
+        return {
+            "kernel_queue": [ev.id for ev in self.kernel_queue],
+            "subject_queue": [ev.id for ev in self.subject_queue],
         }
